@@ -11,16 +11,30 @@ import {
 const noop = () => {};
 
 // Read-only checks: ESP32-S3, 16 MB flash, stock X4 Pro partition table. Throws FlasherError when something is off.
-export async function checkDevice(driver, { log = noop, stockSha } = {}) {
-  const chip = await driver.chipName();
+// Each device call is limited so a silent unit shows an error instead of an endless "checking". onCheck(text) says what is
+// being asked right now.
+const withTimeout = (promise, what, ms = 25000) => {
+  let timer;
+  const limit = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new FlasherError('check-timeout', `The X4 Pro did not answer while ${what}.`,
+      'Unplug it, put it in download mode again (hold the left page button while plugging in) and try again. Another USB cable or port can help.')), ms);
+  });
+  return Promise.race([promise, limit]).finally(() => clearTimeout(timer));
+};
+
+export async function checkDevice(driver, { log = noop, stockSha, onCheck = noop } = {}) {
+  onCheck('Reading the chip type...');
+  const chip = await withTimeout(driver.chipName(), 'reading the chip type');
   if (!/ESP32-S3/i.test(chip)) {
     throw new FlasherError('wrong-chip', `This is not an X4 Pro: the chip is ${chip}, not an ESP32-S3.`, 'Only the Xteink X4 Pro (ESP32-S3) is supported. The original X4 and the X3 use another chip.');
   }
-  const flash = await driver.flashSizeBytes();
+  onCheck('Reading the flash size...');
+  const flash = await withTimeout(driver.flashSizeBytes(), 'reading the flash size');
   if (flash !== FLASH_SIZE) {
     throw new FlasherError('wrong-flash', `Expected 16 MB of flash, found ${flash ? Math.round(flash / 1048576) + ' MB' : 'an unknown size'}.`, 'Only the 16 MB X4 Pro is supported.');
   }
-  const pt = await driver.read(PTABLE_OFFSET, PTABLE_LEN, noop);
+  onCheck('Reading the partition table...');
+  const pt = await withTimeout(driver.read(PTABLE_OFFSET, PTABLE_LEN, noop), 'reading the partition table');
   const res = await checkPartitionTable(pt, stockSha);
   log(`Partition table SHA-256 ${res.sha.slice(0, 16)}...`);
   if (!res.ok) {
@@ -31,7 +45,8 @@ export async function checkDevice(driver, { log = noop, stockSha } = {}) {
     );
   }
   // The image goes to app0. If the bootloader starts app1, the new firmware would never run.
-  const ota = await driver.read(OTADATA_OFFSET, OTADATA_LEN, noop);
+  onCheck('Checking which app slot starts...');
+  const ota = await withTimeout(driver.read(OTADATA_OFFSET, OTADATA_LEN, noop), 'reading the boot slot');
   const slot = activeAppSlot(ota);
   log(`Boot slot: app${slot}`);
   if (slot !== 0) {
@@ -46,9 +61,9 @@ export async function checkDevice(driver, { log = noop, stockSha } = {}) {
 
 // Writes `bytes` to the app slot and checks it landed (MD5 of the flash range vs. the image).
 // onStep(id, label) announces phases; onProgress(fraction) reports the write/read progress of the current phase.
-export async function installApp(driver, bytes, { onStep = noop, onProgress = noop, log = noop, stockSha } = {}) {
+export async function installApp(driver, bytes, { onStep = noop, onProgress = noop, log = noop, stockSha, onCheck = noop } = {}) {
   onStep('check', 'Checking your X4 Pro');
-  const info = await checkDevice(driver, { log, stockSha });
+  const info = await checkDevice(driver, { log, stockSha, onCheck });
   onStep('verify-file', 'Checking the firmware file');
   const img = await validateAppImage(bytes);
   log(`Image OK: ${img.size.toLocaleString()} bytes, ${img.segments} segments`);

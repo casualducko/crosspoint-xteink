@@ -126,3 +126,14 @@ test('accepts app0 from otadata (seq 1) and ignores an entry with a bad CRC', as
   await installApp(d, await makeImage(), { stockSha: pt.sha });
   assert.equal(writes(d).length, 1);
 });
+
+test('a unit that stops answering during the check is reported, not waited on forever', async () => {
+  const pt = await stockPtable();
+  const d = fakeDriver({ ptable: pt.bytes });
+  d.read = () => new Promise(() => {}); // never answers
+  const orig = setTimeout;
+  globalThis.setTimeout = (fn, ms, ...a) => orig(fn, ms > 1000 ? 20 : ms, ...a); // shorten the 25 s limit for the test
+  try {
+    await assert.rejects(checkDevice(d, { stockSha: pt.sha }), (e) => e.code === 'check-timeout');
+  } finally { globalThis.setTimeout = orig; }
+});

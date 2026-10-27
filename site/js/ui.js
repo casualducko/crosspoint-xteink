@@ -105,7 +105,8 @@ async function onConnect() {
     driver = globalThis.__driverFactory ? await globalThis.__driverFactory(log) : new (await driverModule).EspDriver({ log });
     await driver.connect();
     setChecks([['ok', 'Connected'], ['', 'Checking the device...']]);
-    const info = await checkDevice(driver, { log });
+    const done = [['ok', 'Connected']];
+    const info = await checkDevice(driver, { log, onCheck: (t) => { setChecks([...done, ['', t]]); log(t); } });
     setChecks([
       ['ok', `Chip: ${info.chip}`],
       ['ok', `Flash: ${info.flash / 1048576} MB`],
@@ -116,7 +117,8 @@ async function onConnect() {
     $('actions').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   } catch (e) {
     const { title, hint } = explainError(e);
-    setChecks([['fail', title], ['', hint]]);
+    const raw = e && !e.code && e.message ? [['', 'Details: ' + e.message]] : [];
+    setChecks([['fail', title], ['', hint], ...raw]);
     log('ERROR: ' + (e && e.stack ? e.stack : e));
     await closeDriver();
   } finally {
