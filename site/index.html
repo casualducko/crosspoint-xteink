@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CrossPoint for Xteink X4 Pro: web flasher</title>
+<meta name="description" content="Install the unofficial CrossPoint e-reader firmware, with two-unit book mode, on an Xteink X4 Pro from your browser.">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'none'">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>CrossPoint for the Xteink X4 Pro <span class="badge">Unofficial &middot; early beta</span></h1>
+    <p class="lede">Install the CrossPoint e-reader firmware on your X4 Pro from the browser. It takes about two minutes. Two units can also be paired as a two-page book over their built-in radio.</p>
+  </header>
+
+  <div id="unsupported" class="notice bad" hidden>
+    <strong>This browser can't flash devices.</strong> Web flashing needs <strong>Chrome, Edge or another Chromium browser on a desktop computer</strong>
+    (Windows, macOS or Linux). Safari, Firefox and phones can't do it.
+  </div>
+  <div id="insecure" class="notice bad" hidden>This page must be opened over <strong>HTTPS</strong> (or localhost) for the browser to allow USB access.</div>
+
+  <div class="notice warn">
+    <strong>Only the Xteink X4 Pro.</strong> The original X4 and the X3 use a different chip and are refused. This replaces the Xteink firmware in the first app slot.
+    Your settings, books and the second app slot are not touched. Use at your own risk.
+  </div>
+
+  <section class="card" aria-labelledby="s1">
+    <h2 id="s1"><span class="n">1</span> Put the X4 Pro in download mode</h2>
+    <ol class="steps">
+      <li><strong>Unplug the USB cable</strong> and, if the unit is on, switch it off.</li>
+      <li><strong>Press and hold the left page button.</strong></li>
+      <li>While holding it, plug in the <strong>USB-C data cable</strong>, keep holding for about 3 seconds, then let go.</li>
+    </ol>
+    <p class="hint">The screen stays as it was in download mode. A charge-only cable won't work. If the screen shows the reader after you plug in, it is not in download mode: start again.</p>
+  </section>
+
+  <section class="card" aria-labelledby="s2">
+    <h2 id="s2"><span class="n">2</span> Connect</h2>
+    <p>Click the button, pick <em>USB JTAG/serial debug unit</em> in the list, and wait for the checks.</p>
+    <button id="connect" class="primary" type="button">Connect to my X4 Pro</button>
+    <ul id="checks" class="checks" aria-live="polite" hidden></ul>
+  </section>
+
+  <section id="actions" class="card" aria-labelledby="s3" hidden>
+    <h2 id="s3"><span class="n">3</span> Install</h2>
+    <p id="version-line"></p>
+    <div class="row">
+      <button id="install" class="primary" type="button">Install CrossPoint</button>
+      <button id="backup" type="button" title="Reads the current app (about 4 minutes) and saves it as a file">Save a copy of my current firmware first</button>
+    </div>
+    <p class="hint"><strong>Back up first if you may want the Xteink firmware again.</strong> The copy is the app slot only; keep it private, as it is Xteink's software. Only the first app slot (0x10000) is written. Your bootloader, partition table, settings and books are not touched.</p>
+    <details>
+      <summary>Other options</summary>
+      <div class="row">
+        <label class="file">Install my own firmware file&hellip; <input id="own" type="file" accept=".bin"></label>
+      </div>
+      <p class="hint">A file of your own must be an <em>app</em> image for the ESP32-S3, not a full-flash image. This is also how you put back a copy saved above.</p>
+    </details>
+  </section>
+
+  <section id="progress" class="card" aria-live="polite" hidden>
+    <h2 id="progress-title">Working&hellip;</h2>
+    <ol id="phases" class="phases"></ol>
+    <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="bar"></span></div>
+    <p id="progress-note" class="hint">Keep the cable plugged in and this tab open until it says it's done.</p>
+  </section>
+
+  <section id="result" class="card" hidden role="status"></section>
+
+  <details class="card">
+    <summary>Pairing two units as a two-page book</summary>
+    <ol class="steps">
+      <li>Install CrossPoint on both units with this page, then put the same book (same file name and size) on both SD cards.</li>
+      <li>On each unit open Settings and choose <em>Link to second unit</em>. Choose <em>Left page</em> on one and <em>Right page</em> on the other. They find each other by radio on their own.</li>
+      <li>Open the book on the left unit. The right unit opens it too and shows the next page. Closing the two units together locks touch and turns the light off; opening them undoes it.</li>
+    </ol>
+    <p class="hint">To unpair, use <em>Cancel link</em> in the link screen on either unit.</p>
+  </details>
+
+  <details class="card log-card">
+    <summary>Technical log</summary>
+    <pre id="log" aria-label="Technical log"></pre>
+    <button id="copylog" type="button">Copy log</button>
+  </details>
+
+  <details class="card">
+    <summary>Having trouble?</summary>
+    <ul class="faq">
+      <li><strong>The unit isn't in the list.</strong> It must be in download mode (step 1) and plugged in with a data cable. Try another USB port, and avoid hubs.</li>
+      <li><strong>"Busy" or "could not open".</strong> Close other tabs or apps that use the unit's serial port (serial monitors, other flashers), then unplug and redo step 1.</li>
+      <li><strong>It says the partition table is not the stock one.</strong> This flasher only supports X4 Pro units with the original layout and refuses to write anything otherwise. Nothing was changed.</li>
+      <li><strong>It says the unit starts from the second app slot.</strong> An update has moved the unit there. Nothing was changed; a new image in the first slot would not run.</li>
+      <li><strong>After flashing nothing happens.</strong> Unplug the cable, wait 15 seconds, plug it in again and press the power button briefly. If it still does nothing, redo step 1 and flash again.</li>
+      <li><strong>Linux:</strong> if the browser can't open the port, add yourself to the <code>dialout</code> (Debian/Ubuntu) or <code>uucp</code> (Arch/Fedora) group, then log out and in.</li>
+    </ul>
+  </details>
+
+  <footer>
+    <p>Version <span id="v">&hellip;</span> &middot; <a href="https://github.com/casualducko/crosspoint-xteink">This page's source</a> &middot;
+      <a href="https://github.com/casualducko/crosspoint-xteink/blob/HEAD/NOTICE.md">Licences and firmware source</a></p>
+    <p>An unofficial port, not affiliated with Xteink or the CrossPoint project. Use at your own risk. Everything runs in your browser; the only download is the firmware from this site.</p>
+  </footer>
+</main>
+<script type="module" src="js/ui.js"></script>
+</body>
+</html>

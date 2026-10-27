@@ -1,0 +1,57 @@
+name: Web flasher
+
+# Tests the flasher against its fake device and publishes site/ to GitHub Pages on every push to main.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+      - name: Tests (the bundled firmware image is validated too)
+        run: node --test test/*.test.mjs
+        env:
+          FIRMWARE_BIN: site/firmware/crosspoint-xteink-app.bin
+      - name: Manifest matches the bundled image
+        run: |
+          set -euo pipefail
+          want=$(python3 -c "import json;print(json.load(open('site/manifest.json'))['firmware']['sha256'])")
+          have=$(sha256sum site/firmware/crosspoint-xteink-app.bin | cut -d' ' -f1)
+          [ "$want" = "$have" ] || { echo "manifest.json does not match the firmware file"; exit 1; }
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-24.04
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

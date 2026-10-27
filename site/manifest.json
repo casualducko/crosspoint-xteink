@@ -1,0 +1,10 @@
+{
+  "name": "CrossPoint for the Xteink X4 Pro",
+  "version": "0.1.0-1",
+  "released": "2026-10-27",
+  "firmware": {
+    "path": "firmware/crosspoint-xteink-app.bin",
+    "size": 5648432,
+    "sha256": "a4472887e1f94bdcd4654bfe3f6f8fce033fe6bba19593f15de612165a05c272"
+  }
+}
