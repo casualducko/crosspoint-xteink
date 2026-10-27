@@ -61,9 +61,10 @@ export async function checkDevice(driver, { log = noop, stockSha, onCheck = noop
 
 // Writes `bytes` to the app slot and checks it landed (MD5 of the flash range vs. the image).
 // onStep(id, label) announces phases; onProgress(fraction) reports the write/read progress of the current phase.
-export async function installApp(driver, bytes, { onStep = noop, onProgress = noop, log = noop, stockSha, onCheck = noop } = {}) {
+// skipCheck: the page already ran checkDevice on this connection; asking the unit again only adds reads that can stall.
+export async function installApp(driver, bytes, { onStep = noop, onProgress = noop, log = noop, stockSha, onCheck = noop, skipCheck = false } = {}) {
   onStep('check', 'Checking your X4 Pro');
-  const info = await checkDevice(driver, { log, stockSha, onCheck });
+  const info = skipCheck ? {} : await checkDevice(driver, { log, stockSha, onCheck });
   onStep('verify-file', 'Checking the firmware file');
   const img = await validateAppImage(bytes);
   log(`Image OK: ${img.size.toLocaleString()} bytes, ${img.segments} segments`);
@@ -141,9 +142,9 @@ export async function installFromUrl(driver, { url, sha256, size }, hooks = {}) 
 }
 
 // Reads the whole app slot (7.9 MB) so the user can keep a copy of what they had. Read-only.
-export async function backupApp(driver, { onStep = noop, onProgress = noop, log = noop, stockSha } = {}) {
+export async function backupApp(driver, { onStep = noop, onProgress = noop, log = noop, stockSha, skipCheck = false } = {}) {
   onStep('check', 'Checking your X4 Pro');
-  await checkDevice(driver, { log, stockSha });
+  if (!skipCheck) await checkDevice(driver, { log, stockSha });
   onStep('read', 'Reading your current firmware (about 3 minutes)');
   const data = await driver.read(APP_OFFSET, APP_SLOT_SIZE, onProgress);
   // The copy is only worth keeping if it is what the chip holds: compare with the loader's MD5 of the same range.

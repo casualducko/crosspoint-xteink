@@ -127,7 +127,7 @@ async function onConnect() {
   }
 }
 
-const hooks = () => ({ log, onStep: (id) => setPhase(id), onProgress: (f) => setBar(f) });
+const hooks = () => ({ log, skipCheck: true, onStep: (id) => setPhase(id), onProgress: (f) => setBar(f) });
 
 async function run(title, phaseIds, job, doneTitle, doneLines) {
   if (busy || !driver) return;
