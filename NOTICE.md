@@ -57,7 +57,7 @@ Xtensa GCC toolchain with its newlib/libgcc runtime. The compiled firmware conta
 4. Corresponding source (GPL-2.0 section 3, LGPL-2.1 section 6)
 ----------------------------------------------------------------
 The firmware image served by the web flasher is built from the git tag named in manifest.json's version
-("xteink-v<version>", for example xteink-v0.1.0-1) of https://github.com/casualducko/crosspoint-diptyx (branch
+("xteink-v<version>", for example xteink-v0.2.0-1) of https://github.com/casualducko/crosspoint-diptyx (branch
 xteink-link), together with its submodule freeink-sdk at the commit that tag pins
 (https://github.com/casualducko/freeink-sdk). It builds with PlatformIO using the environment `x4pro-radio`
 (`ENVNAME=x4pro-radio ./build-crosspoint.sh` in the port repository, https://github.com/casualducko/diptyx-crosspoint,
