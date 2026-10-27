@@ -57,7 +57,7 @@ function setBar(f) {
   $('bar').parentElement.setAttribute('aria-valuenow', String(pct));
 }
 
-function finishPhases() { for (const li of $('phases').children) li.className = 'done'; setBar(1); }
+function finishPhases() { stopPhases(); log(`[${new Date().toLocaleTimeString()}] Done.`); for (const li of $('phases').children) li.className = 'done'; setBar(1); }
 
 function showResult(kind, title, lines = []) {
   $('progress').hidden = true;
@@ -70,6 +70,7 @@ function showResult(kind, title, lines = []) {
 }
 
 function fail(err) {
+  stopPhases();
   const { title, hint } = explainError(err);
   log('ERROR: ' + (err && err.stack ? err.stack : err));
   const raw = err && !err.code && err.message ? 'Details: ' + err.message : '';
@@ -127,7 +128,47 @@ async function onConnect() {
   }
 }
 
-const hooks = () => ({ log, skipCheck: true, onStep: (id) => setPhase(id), onProgress: (f) => setBar(f) });
+// Progress with numbers: share done, speed, time left, and a warning when nothing has moved for a while. Each phase's
+// size is known to the caller only as a fraction, so the byte figures use the size of the job being run (`jobBytes`).
+const NOTE = 'Keep the cable plugged in and this tab open until it says it\'s done.';
+let phaseStart = 0, lastMove = 0, lastLogged = -1, stallTimer = null, jobBytes = 0, phaseName = '';
+
+function startPhase(id) {
+  phaseName = PHASES[id] || id;
+  phaseStart = lastMove = Date.now();
+  lastLogged = -1;
+  log(`[${new Date().toLocaleTimeString()}] ${phaseName}...`);
+  clearInterval(stallTimer);
+  stallTimer = setInterval(() => {
+    const idle = Math.round((Date.now() - lastMove) / 1000);
+    if (idle >= 20) {
+      $('progress-note').textContent = `No progress for ${idle} seconds. Keep waiting a little; if it stays like this, unplug the cable, put the X4 Pro in download mode again and retry. ` + NOTE;
+      if (idle % 20 === 0) log(`No progress for ${idle} s during: ${phaseName}`);
+    }
+  }, 5000);
+}
+
+function stopPhases() { clearInterval(stallTimer); stallTimer = null; $('progress-note').textContent = NOTE; }
+
+function onProgressDetail(f) {
+  setBar(f);
+  lastMove = Date.now();
+  const secs = (Date.now() - phaseStart) / 1000;
+  const pct = Math.floor(f * 100);
+  let text = `${phaseName}: ${pct}%`;
+  if (jobBytes && f > 0.01 && secs > 2) {
+    const speed = (f * jobBytes) / secs; // bytes per second
+    const left = Math.max(0, Math.round((1 - f) * jobBytes / speed));
+    text += ` (${(f * jobBytes / 1048576).toFixed(1)} of ${(jobBytes / 1048576).toFixed(1)} MB, ${Math.round(speed / 1024)} KB/s, about ${left >= 90 ? Math.round(left / 60) + ' min' : left + ' s'} left)`;
+  }
+  $('progress-note').textContent = text + '. ' + NOTE;
+  if (pct >= lastLogged + 10) { lastLogged = pct - (pct % 10); log(`[${new Date().toLocaleTimeString()}] ${text}`); }
+}
+
+const hooks = (bytes = 0) => {
+  jobBytes = bytes;
+  return { log, skipCheck: true, onStep: (id) => { setPhase(id); startPhase(id); }, onProgress: onProgressDetail };
+};
 
 async function run(title, phaseIds, job, doneTitle, doneLines) {
   if (busy || !driver) return;
@@ -159,7 +200,7 @@ function onInstall() {
   const fw = manifest.firmware;
   if (!fw) return;
   run('Installing CrossPoint ' + manifest.version, ['download', 'check', 'verify-file', 'write', 'verify-write', 'reset'],
-    () => installFromUrl(driver, { url: new URL(fw.path, location.href).href, sha256: fw.sha256, size: fw.size }, hooks()),
+    () => installFromUrl(driver, { url: new URL(fw.path, location.href).href, sha256: fw.sha256, size: fw.size }, hooks(fw.size)),
     'CrossPoint is installed.', AFTER);
 }
 
@@ -169,7 +210,7 @@ async function onOwnFile(ev) {
   if (!file || busy || !driver) return;
   if (!confirm(`Install "${file.name}" (${file.size.toLocaleString()} bytes) into the app slot?`)) return;
   run('Installing ' + file.name, ['check', 'verify-file', 'write', 'verify-write', 'reset'],
-    async () => installApp(driver, new Uint8Array(await file.arrayBuffer()), hooks()), 'Your firmware is installed.', AFTER_OWN);
+    async () => installApp(driver, new Uint8Array(await file.arrayBuffer()), hooks(file.size)), 'Your firmware is installed.', AFTER_OWN);
 }
 
 async function onBackup() {
@@ -177,7 +218,7 @@ async function onBackup() {
   setBusy(true);
   showProgress('Saving a copy of your current firmware', ['check', 'read']);
   try {
-    const data = await backupApp(driver, hooks());
+    const data = await backupApp(driver, hooks(0x7e0000));
     finishPhases();
     const d = new Date().toISOString().slice(0, 10);
     const a = document.createElement('a');
