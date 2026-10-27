@@ -51,8 +51,26 @@ export class EspDriver {
     return m ? Number(m[1]) * 1024 * 1024 : 0;
   }
 
-  read(addr, len, onProgress) {
-    return this.loader.readFlash(addr, len, (_pkt, got, total) => onProgress && onProgress(total ? got / total : 0));
+  // Large reads go out in pieces: one request for the whole 7.9 MB slot can run into the loader's timeouts. A piece that
+  // fails is asked for again (the loader answers a repeated request), so one lost packet does not end a four-minute read.
+  async read(addr, len, onProgress) {
+    const PIECE = 128 * 1024;
+    const out = new Uint8Array(len);
+    for (let off = 0; off < len; off += PIECE) {
+      const n = Math.min(PIECE, len - off);
+      let part;
+      for (let attempt = 1; ; attempt++) {
+        try {
+          part = await this.loader.readFlash(addr + off, n, (_pkt, got, total) => onProgress && onProgress((off + (total ? got * n / total : 0)) / len));
+          break;
+        } catch (e) {
+          this.log(`Read at 0x${(addr + off).toString(16)} failed (try ${attempt}): ${e && e.message ? e.message : e}`);
+          if (attempt >= 3) throw e;
+        }
+      }
+      out.set(part, off);
+    }
+    return out;
   }
 
   async write(addr, bytes, onProgress) {

@@ -72,7 +72,8 @@ function showResult(kind, title, lines = []) {
 function fail(err) {
   const { title, hint } = explainError(err);
   log('ERROR: ' + (err && err.stack ? err.stack : err));
-  showResult('fail', title, [hint, 'Nothing on your device was changed outside the app slot. The technical log below has details.']);
+  const raw = err && !err.code && err.message ? 'Details: ' + err.message : '';
+  showResult('fail', title, [hint, raw, 'Nothing on your device was changed outside the app slot. The technical log below has details.']);
 }
 
 // The Connect button is the blue call to action only until the X4 Pro is connected; then the Install button below it takes over.
