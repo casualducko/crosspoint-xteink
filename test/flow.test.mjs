@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { checkDevice, installApp, backupApp, fetchVerified } from '../site/js/flow.js';
+import { checkDevice, installApp, fetchVerified } from '../site/js/flow.js';
 import { FlasherError, md5Hex } from '../site/js/core.js';
 import { otaEntry } from './helpers.mjs';
 import { makeImage, fakeDriver, stockPtable } from './helpers.mjs';
@@ -57,25 +57,6 @@ test('a write error surfaces unchanged', async () => {
   const pt = await stockPtable();
   const d = fakeDriver({ ptable: pt.bytes, failWrite: true });
   await assert.rejects(installApp(d, await makeImage(), { stockSha: pt.sha }), /disconnected/);
-});
-
-test('backup refuses a non-stock table, reads the app slot, verifies it, and never writes', async () => {
-  const pt = await stockPtable();
-  const refused = fakeDriver({ ptable: pt.bytes });
-  const err = await backupApp(refused, {}).catch((e) => e);
-  assert.equal(err.code, 'not-stock-layout', 'the real stock hash does not match the test table, so it refuses');
-  const d = fakeDriver({ ptable: pt.bytes });
-  const img = await makeImage();
-  await installApp(d, img, { stockSha: pt.sha });
-  const data = await backupApp(d, { stockSha: pt.sha });
-  assert.equal(data.length, 0x7e0000);
-  assert.deepEqual(data.slice(0, img.length), img);
-  assert.equal(writes(d).length, 1, 'only the earlier install wrote');
-  // a read that disagrees with the chip's own MD5 is not handed back as a backup
-  const flaky = fakeDriver({ ptable: pt.bytes });
-  const realRead = flaky.read.bind(flaky);
-  flaky.read = async (a, l, p) => { const r = await realRead(a, l, p); if (a === 0x10000) r[7] ^= 1; return r; };
-  await assert.rejects(backupApp(flaky, { stockSha: pt.sha }), (e) => e.code === 'verify-failed');
 });
 
 test('an image whose length is not a multiple of 4 verifies (0xFF padding like esptool-js)', async () => {

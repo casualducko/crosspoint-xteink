@@ -8,8 +8,8 @@ The build adds a **two-unit mode**: two X4 Pros pair by ESP-NOW radio and read a
 - **Safe by construction:** the page writes only the first app slot (0x10000) after it has checked the chip, the flash size, that the partition
   table is the stock X4 Pro one (SHA-256 pinned in `site/js/core.js`) and that the bootloader starts that slot (otadata); it validates the image
   (header, checksum, digest) before writing and compares the loader's MD5 of the flash with the file afterwards. The bootloader, partition
-  table, settings and SD card are not touched. It does not offer a way back to the Xteink firmware: save a copy of your app slot with the page's
-  backup button first.
+  table, settings and SD card are not touched. It offers no backup or restore: reading 8 MB over WebSerial stalled on real hardware, so the page shows the
+  esptool command to save a copy of the app slot instead.
 - **Source of the firmware:** see `NOTICE.md` (the firmware contains GPL-2.0 code, so its source is offered there).
 
 ## Layout

@@ -1,6 +1,6 @@
 // Page logic for the X4 Pro web flasher: wires the buttons to the flows in flow.js and keeps the user informed.
 import { parseManifest, explainError } from './core.js';
-import { checkDevice, installApp, installFromUrl, backupApp } from './flow.js';
+import { checkDevice, installApp, installFromUrl } from './flow.js';
 
 const $ = (id) => document.getElementById(id);
 const supported = typeof navigator !== 'undefined' && 'serial' in navigator;
@@ -18,7 +18,6 @@ const PHASES = {
   write: 'Write the firmware',
   'verify-write': 'Verify what was written',
   reset: 'Restart the X4 Pro',
-  read: 'Read your current firmware',
 };
 
 function log(line) {
@@ -31,7 +30,7 @@ function setBusy(on) {
   busy = on;
   $('connect').disabled = on || !supported;
   $('install').disabled = on || !manifest.firmware;
-  for (const id of ['backup', 'own']) $(id).disabled = on;
+  for (const id of ['own']) $(id).disabled = on;
 }
 
 function showProgress(title, phaseIds) {
@@ -213,23 +212,6 @@ async function onOwnFile(ev) {
     async () => installApp(driver, new Uint8Array(await file.arrayBuffer()), hooks(file.size)), 'Your firmware is installed.', AFTER_OWN);
 }
 
-async function onBackup() {
-  if (busy || !driver) return;
-  setBusy(true);
-  showProgress('Saving a copy of your current firmware', ['check', 'read']);
-  try {
-    const data = await backupApp(driver, hooks(0x7e0000));
-    finishPhases();
-    const d = new Date().toISOString().slice(0, 10);
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([data], { type: 'application/octet-stream' }));
-    a.download = `x4pro-app-backup-${d}.bin`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 60000);
-    showResult('ok', 'Backup saved.', [`Saved as ${a.download} (${data.length.toLocaleString()} bytes). It is the app slot only, so you can put it back later with "Install my own firmware file" (open Other options). Keep it private.`, 'You can now install CrossPoint below.']);
-  } catch (e) { fail(e); await closeDriver(); } finally { setBusy(false); }
-}
-
 async function loadManifest() {
   try {
     const res = await fetch('manifest.json', { cache: 'no-store' });
@@ -251,7 +233,6 @@ function init() {
   }
   $('connect').addEventListener('click', onConnect);
   $('install').addEventListener('click', onInstall);
-  $('backup').addEventListener('click', onBackup);
   $('own').addEventListener('change', onOwnFile);
   $('copylog').addEventListener('click', async () => {
     try { await navigator.clipboard.writeText($('log').textContent); $('copylog').textContent = 'Copied'; setTimeout(() => ($('copylog').textContent = 'Copy log'), 1500); } catch { /* clipboard blocked */ }

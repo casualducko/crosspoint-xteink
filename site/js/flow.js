@@ -1,4 +1,4 @@
-// The install / backup sequences. They talk to the device only through a `driver` object (see esp-driver.js),
+// The install sequences. They talk to the device only through a `driver` object (see esp-driver.js),
 // so the same code runs against the real chip in the browser and against a fake one in the tests.
 //
 // driver: { connect(), chipName(), flashSizeBytes(), read(addr, len, onProgress), write(addr, bytes, onProgress),
@@ -139,18 +139,4 @@ export async function installFromUrl(driver, { url, sha256, size }, hooks = {}) 
   hooks.onStep && hooks.onStep('download', 'Downloading the firmware');
   const bytes = await fetchVerified(url, { sha256, expectedSize: size, onProgress: hooks.onProgress, fetchImpl: hooks.fetchImpl });
   return installApp(driver, bytes, hooks);
-}
-
-// Reads the whole app slot (7.9 MB) so the user can keep a copy of what they had. Read-only.
-export async function backupApp(driver, { onStep = noop, onProgress = noop, log = noop, stockSha, skipCheck = false } = {}) {
-  onStep('check', 'Checking your X4 Pro');
-  if (!skipCheck) await checkDevice(driver, { log, stockSha });
-  onStep('read', 'Reading your current firmware (about 3 minutes)');
-  const data = await driver.read(APP_OFFSET, APP_SLOT_SIZE, onProgress);
-  // The copy is only worth keeping if it is what the chip holds: compare with the loader's MD5 of the same range.
-  const got = String(await driver.md5(APP_OFFSET, APP_SLOT_SIZE)).toLowerCase();
-  if (got !== md5Hex(data)) {
-    throw new FlasherError('verify-failed', 'The copy that was read does not match the flash, so it was not saved.', 'Try again with another USB cable or port.');
-  }
-  return data;
 }
